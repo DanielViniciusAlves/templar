@@ -7,7 +7,7 @@ Templar is a simple and minimalistic template composer library designed to facil
 
 To use Templar, create a map where the keys represent file names and the values contain the data that the corresponding template requires. Ensure that the order of keys in the map reflects the significance of the templates, from least to most significant.
 
-*** The order passed must be from the least significant to the most significant***
+**The order passed must be from the least significant to the most significant**
 
 Here's an example implementation using Echo:
 
