@@ -17,6 +17,7 @@ type Templar struct {
 	defaultPath string
 	Components  map[string]template.HTML
 	Data        map[string]interface{}
+	Templates   []string
 }
 
 type Element struct {
@@ -24,31 +25,39 @@ type Element struct {
 	Data       interface{}
 }
 
-func New(defaultPath string, data map[string]interface{}) *Templar {
+func New(defaultPath string, data map[string]interface{}, order []string) *Templar {
 	return &Templar{
 		defaultPath: defaultPath,
 		Components:  make(map[string]template.HTML),
 		Data:        data,
+		Templates:   order,
 	}
 }
 
-func (t *Templar) ParseHTML(templ ...string) interface{} {
+func (t *Templar) ParseHTML() interface{} {
 	var files []string
 
-	for chave := range t.Data {
+	temp := &Templar{
+		Components: make(map[string]template.HTML),
+		Data:       t.Data,
+		Templates:  t.Templates,
+	}
+
+	for _, chave := range temp.Templates {
 		fmt.Print(chave)
 		files = append(files, t.defaultPath+chave+".html")
 	}
 
 	tmpl, _ := template.ParseFiles(files...)
 
+	fmt.Println(files)
 	for _, fileName := range files {
 		name := getFileName(fileName)
 		var buf bytes.Buffer
 
 		element := &Element{
-			Components: t.Components,
-			Data:       t.Data[name],
+			Components: temp.Components,
+			Data:       temp.Data[name],
 		}
 
 		err := tmpl.ExecuteTemplate(&buf, name, element)
@@ -57,13 +66,13 @@ func (t *Templar) ParseHTML(templ ...string) interface{} {
 		}
 
 		output := template.HTML(buf.String())
-		err = t.addComponent(name, output)
+		err = temp.addComponent(name, output)
 		if err != nil {
 			fmt.Printf("Erro: %v\n", err)
 		}
 	}
 
-	return t.Components
+	return temp.Components
 }
 
 func getFileName(file string) string {
