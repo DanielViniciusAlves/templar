@@ -1,7 +1,6 @@
 # Templar
 
-
-Templar is a simple and minimalistic template composer library designed to facilitate template creation. While it is still a work in progress, you might find it useful for streamlining your template handling. Although creating templates without a library is entirely possible, Templar aims to provide a structured approach for managing template data.
+Templar is a simple and minimalist template composer library designed to facilitate template creation. You probably don't need this; I just created it to simplify my template creation process. So, when I want to undertake a server-side rendering project, I don't need to worry about how to access data in the template and how to render each template.
 
 ## Usage Example
 
