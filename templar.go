@@ -2,103 +2,99 @@ package templar
 
 import (
 	"bytes"
-	"fmt"
 	"html/template"
-	"log"
-	"os"
-	"regexp"
+
+	"github.com/labstack/echo/v4"
 )
 
-type Render interface {
-	TemplarRender() string
+type compMap map[string]template.HTML
+
+type templar struct {
+	info        []TemplateInfo
+	components  compMap
+	defaultPath string
 }
 
-type Templar struct {
-	defaultPath string
-	Components  map[string]template.HTML
-	Data        map[string]interface{}
-	Templates   []string
+type TemplateInfo struct {
+	TemplateName string
+	TemplateData interface{}
+	FileName     string
 }
 
 type Element struct {
-	Components map[string]template.HTML
-	Data       interface{}
+	Comp compMap
+	Data interface{}
 }
 
-func New(defaultPath string, data map[string]interface{}, order []string) *Templar {
-	return &Templar{
+func ParseAndRender(res int, defaultPath string, info []TemplateInfo, c echo.Context) error {
+	templar := &templar{
 		defaultPath: defaultPath,
-		Components:  make(map[string]template.HTML),
-		Data:        data,
-		Templates:   order,
+		components:  make(compMap),
+		info:        info,
 	}
+
+	p, err := templar.ParseHTML()
+	if err != nil {
+		return err
+	}
+
+	return c.HTML(res, p)
 }
 
-func (t *Templar) ParseHTML() interface{} {
-	var files []string
+func (t *templar) ParseHTML() (string, error) {
+	last := len(t.info) - 1
 
-	temp := &Templar{
-		Components: make(map[string]template.HTML),
-		Data:       t.Data,
-		Templates:  t.Templates,
+	p, err := t.parseHelper()
+	if err != nil {
+		return "", err
 	}
 
-	for _, chave := range temp.Templates {
-		fmt.Print(chave)
-		files = append(files, t.defaultPath+chave+".html")
-	}
-
-	tmpl, _ := template.ParseFiles(files...)
-
-	fmt.Println(files)
-	for _, fileName := range files {
-		name := getFileName(fileName)
+	for i, info := range t.info {
 		var buf bytes.Buffer
 
 		element := &Element{
-			Components: temp.Components,
-			Data:       temp.Data[name],
+			Comp: t.components,
+			Data: info.TemplateData,
 		}
 
-		err := tmpl.ExecuteTemplate(&buf, name, element)
+		err := p.ExecuteTemplate(&buf, info.TemplateName, element)
 		if err != nil {
-			log.Fatal(err)
+			return "", &CustomError{
+				Message:      "Error executing the templates using ParseAndRender.",
+				DefaultError: err,
+			}
 		}
 
-		output := template.HTML(buf.String())
-		err = temp.addComponent(name, output)
-		if err != nil {
-			fmt.Printf("Erro: %v\n", err)
+		if i == last {
+			return buf.String(), nil
+		}
+
+		t.components[info.TemplateName] = template.HTML(buf.String())
+	}
+
+	return "", &CustomError{
+		Message: "Unexpected result from HTML parsing in Templar.",
+	}
+}
+
+func (t *templar) parseHelper() (*template.Template, error) {
+	var files []string
+
+	for _, info := range t.info {
+		if len(info.FileName) > 0 {
+			files = append(files, t.defaultPath+info.FileName+".html")
+		} else {
+			files = append(files, t.defaultPath+info.TemplateName+".html")
 		}
 	}
 
-	return temp.Components
-}
-
-func getFileName(file string) string {
-	content, err := os.ReadFile(file)
+	parsedTemplates, err := template.ParseFiles(files...)
 	if err != nil {
-		fmt.Println("Erro ao ler o arquivo:", err)
-		return ""
+		return nil, &CustomError{
+			Message:      "Error parsing the template files.",
+			DefaultError: err,
+		}
 	}
 
-	htmlContent := string(content)
-
-	re := regexp.MustCompile(`{{define "([^"]+)"}}`)
-
-	matches := re.FindStringSubmatch(htmlContent)
-
-	if len(matches) == 2 {
-		valorDefinido := matches[1]
-		return valorDefinido
-	} else {
-		fmt.Println("Padrão não encontrado no arquivo.")
-		return ""
-	}
-}
-
-func (t *Templar) addComponent(name string, output template.HTML) error {
-	t.Components[name] = output
-
-	return nil
+	return parsedTemplates, nil
 }
